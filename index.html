@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Post Visualization</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f5f5dc; display: flex; }
+        #plot { height: 100vh; } /* Let JavaScript handle the width */
+        #side-panel {
+            width: 300px; /* Initial width */
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.8);
+            border-left: 1px solid #ccc;
+            overflow-y: auto;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        #resizer {
+            width: 5px;
+            background: #ccc;
+            cursor: ew-resize;
+            height: 100vh;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="plot"></div>
+    <div id="resizer"></div>
+    <div id="side-panel">Loading data...</div>
+    <div id="loading">Loading...</div>
+
+    <script>
+        const plot = document.getElementById('plot');
+        const resizer = document.getElementById('resizer');
+        const sidePanel = document.getElementById('side-panel');
+        let originalWidth = 300;
+        let originalMouseX = 0;
+
+        resizer.addEventListener('mousedown', function(e) {
+            originalWidth = sidePanel.offsetWidth;
+            originalMouseX = e.pageX;
+            window.addEventListener('mousemove', resize);
+            window.addEventListener('mouseup', stopResize);
+        });
+
+        function resize(e) {
+            const width = originalWidth - (e.pageX - originalMouseX);
+            sidePanel.style.width = width + 'px';
+            plot.style.width = (window.innerWidth - width) + 'px';
+            renderer.setSize(window.innerWidth - width, window.innerHeight);
+            camera.aspect = (window.innerWidth - width) / window.innerHeight;
+            camera.updateProjectionMatrix();
+        }
+
+        function stopResize() {
+            window.removeEventListener('mousemove', resize);
+        }
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f5f5dc');
+        const camera = new THREE.PerspectiveCamera(75, (window.innerWidth - 300) / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth - 300, window.innerHeight);
+        plot.appendChild(renderer.domElement);
+
+        // Orbit controls for smoother camera movement
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 1;
+        controls.maxDistance = 10;
+        controls.target.set(0, 0, 0);
+        camera.position.set(3, 3, 3);
+        controls.enablePan = true;
+        controls.panSpeed = 0.5;
+        controls.update();
+
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        const gridSize = 10;
+        const gridDivisions = 20;
+        const gridColor = '#d3d3d3';
+
+        const gridHelperXZ = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor);
+        scene.add(gridHelperXZ);
+
+        const gridHelperXY = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor);
+        gridHelperXY.rotation.x = Math.PI / 2;
+        scene.add(gridHelperXY);
+
+        const gridHelperYZ = new THREE.GridHelper(gridSize, gridDivisions, gridColor, gridColor);
+        gridHelperYZ.rotation.z = Math.PI / 2;
+        scene.add(gridHelperYZ);
+
+        const axesHelper = new THREE.AxesHelper(2);
+        scene.add(axesHelper);
+
+        async function fetchPosts() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/posts');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const posts = await response.json();
+                return posts;
+            } catch (error) {
+                console.error('Error fetching posts:', error);
+                document.getElementById('side-panel').textContent = 'Error loading data';
+                return [];
+            }
+        }
+
+        function renderPosts(posts) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('side-panel').textContent = 'Click on a point to see details';
+
+            const spheres = [];
+            posts.forEach((post, index) => {
+                const geometry = new THREE.SphereGeometry(0.05, 16, 16);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: new THREE.Color().setHSL(index / posts.length, 0.7, 0.5),
+                    shininess: 30
+                });
+                const sphere = new THREE.Mesh(geometry, material);
+                sphere.position.set(post.point_x, post.point_y, post.point_z);
+                sphere.userData = { post };
+                spheres.push(sphere);
+
+                // Add label
+                const label = createTextLabel(post.title, sphere);
+                scene.add(label);
+
+                scene.add(sphere);
+            });
+
+            // Add hover effect
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            let hoveredSphere = null;
+
+            function onMouseMove(event) {
+                mouse.x = (event.clientX / (window.innerWidth - parseInt(sidePanel.style.width || 300))) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(spheres);
+
+                if (intersects.length > 0) {
+                    const sphere = intersects[0].object;
+                    if (hoveredSphere !== sphere) {
+                        if (hoveredSphere) {
+                            hoveredSphere.material.emissive.setHex(0x000000);
+                        }
+                        sphere.material.emissive.setHex(0x444444);
+                        hoveredSphere = sphere;
+                    }
+                } else if (hoveredSphere) {
+                    hoveredSphere.material.emissive.setHex(0x000000);
+                    hoveredSphere = null;
+                }
+            }
+
+            function onMouseClick(event) {
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(spheres);
+
+                if (intersects.length > 0) {
+                    const sphere = intersects[0].object;
+                    sphere.material.emissive.setHex(0x888800);
+                    displayPointInfo(sphere.userData.post);
+                }
+            }
+
+            plot.addEventListener('mousemove', onMouseMove, false);
+            plot.addEventListener('click', onMouseClick, false);
+        }
+
+        // Create text labels
+        function createTextLabel(text, parent) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 128;
+            const context = canvas.getContext('2d');
+            context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.font = 'Bold 20px Arial';
+            context.fillStyle = 'white';
+            context.textAlign = 'center';
+            context.fillText(text, canvas.width/2, canvas.height/2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(0.5, 0.25, 1);
+            sprite.position.copy(parent.position);
+            sprite.position.y += 0.15;
+            sprite.userData = { isLabel: true };
+            
+            return sprite;
+        }
+
+        function displayPointInfo(post) {
+            const sidePanel = document.getElementById('side-panel');
+            sidePanel.innerHTML = `
+                <h2>${post.title}</h2>
+                <p><strong>Position:</strong> 
+                X: ${post.point_x.toFixed(3)}, 
+                Y: ${post.point_y.toFixed(3)}, 
+                Z: ${post.point_z.toFixed(3)}</p>
+                <p><strong>Content:</strong> ${post.post_content_text}</p>
+                ${post.post_content_image ? `<img src="${post.post_content_image}" width="100%">` : ''}
+            `;
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const sidePanelWidth = sidePanel.offsetWidth;
+            camera.aspect = (window.innerWidth - sidePanelWidth) / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth - sidePanelWidth, window.innerHeight);
+            plot.style.width = (window.innerWidth - sidePanelWidth) + 'px';
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Initialize and fetch data
+        async function init() {
+            const posts = await fetchPosts();
+            renderPosts(posts);
+        }
+
+        init();
+    </script>
+</body>
+</html>
