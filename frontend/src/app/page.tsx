@@ -1,126 +1,145 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import PlotCanvas, { Post } from "./components/PlotCanvas";
-import Sidebar from "./components/Sidebar";
-import { useTheme } from "./context/ThemeContext";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/util/supabase/supabase';
+import type { Session } from '@supabase/supabase-js';
 
-export default function ResizableLayout() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
-  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
-  const isDragging = useRef(false);
-  const throttledResize = useRef<NodeJS.Timeout | null>(null);
-  const { theme, toggleTheme } = useTheme();
+import ResizableLayout from './components/Board';
+import Auth from './components/Auth';
 
-  useEffect(() => {
-    fetch("/api/posts")
-      .then((res) => res.json())
-      .then(setPosts)
-      .catch((err) => console.error("Failed to fetch posts:", err));
-  }, []);
+type TabType = 'board' | 'profile' | 'settings' | 'signin';
 
-  const updateCanvasDimensions = useCallback(() => {
-    if (canvasContainerRef.current) {
-      const rect = canvasContainerRef.current.getBoundingClientRect();
-      setCanvasDimensions({
-        width: Math.max(rect.width, 100),
-        height: rect.height,
-      });
-    }
-  }, []);
+export default function Page() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('board');
 
   useEffect(() => {
-    const handleResize = () => {
-      if (throttledResize.current) clearTimeout(throttledResize.current);
-      throttledResize.current = setTimeout(updateCanvasDimensions, 16);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (throttledResize.current) clearTimeout(throttledResize.current);
-    };
-  }, [updateCanvasDimensions]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    document.querySelectorAll("canvas, iframe").forEach((el) => {
-      (el as HTMLElement).style.pointerEvents = "none";
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
     });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      // If user signs in while on sign in tab, switch to board
+      if (session && activeTab === 'signin') {
+        setActiveTab('board');
+      }
+    });
+
+    return () => listener?.subscription.unsubscribe();
+  }, [activeTab]);
+
+  const user = session?.user;
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setActiveTab('signin');
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging.current) return;
-    const newWidth = Math.max(150, Math.min(window.innerWidth - e.clientX, 800));
-    setSidebarWidth(newWidth);
-  }, []);
+  const handleTabClick = (tab: TabType) => {
+    // Don't allow switching to signin tab if user is already signed in
+    if (tab === 'signin' && user) return;
+    setActiveTab(tab);
+  };
 
-  const handleMouseUp = useCallback(() => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center text-lg font-serif">
+        Loading...
+      </div>
+    );
+  }
 
-    document.querySelectorAll("canvas, iframe").forEach((el) => {
-      (el as HTMLElement).style.pointerEvents = "";
-    });
+  return (
+    <main className="min-h-screen bg-black text-white font-serif flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4 border-b border-white">
+        <div className="text-2xl">Your Forum</div>
+        <div className="flex items-center space-x-4">
+          {/* Custom Tab Navigation */}
+          <nav className="flex space-x-4">
+            <button
+              onClick={() => handleTabClick('board')}
+              className={tabClass(activeTab === 'board')}
+            >
+              Board
+            </button>
+            <button
+              onClick={() => handleTabClick('profile')}
+              className={tabClass(activeTab === 'profile')}
+            >
+              Profile
+            </button>
+            <button
+              onClick={() => handleTabClick('settings')}
+              className={tabClass(activeTab === 'settings')}
+            >
+              Settings
+            </button>
+            {!user && (
+              <button
+                onClick={() => handleTabClick('signin')}
+                className={tabClass(activeTab === 'signin')}
+              >
+                Sign In
+              </button>
+            )}
+          </nav>
 
-    updateCanvasDimensions();
-  }, [updateCanvasDimensions]);
+          {user && (
+            <button
+              onClick={signOut}
+              className="text-red-500 bg-transparent border-none text-sm hover:underline"
+            >
+              Sign Out
+            </button>
+          )}
+        </div>
+      </header>
 
-  // Add mousemove/up listeners
-  useEffect(() => {
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
+      {/* Welcome */}
+      {user && (
+        <div className="w-full flex justify-end px-6 py-2 text-sm text-gray-300 border-b border-white">
+          user: <span className="text-white ml-1">{user.email}</span>
+        </div>
+      )}
 
-  // Update canvas size when sidebar changes
-  useEffect(() => {
-    updateCanvasDimensions();
-  }, [sidebarWidth, updateCanvasDimensions]);
-
-return (
-  <div
-    className={`flex w-screen h-screen overflow-hidden ${
-      theme === "dark" ? "bg-gray-900" : "bg-white"
-    }`}
-  >
-    {/* Canvas area */}
-    <div 
-      ref={canvasContainerRef} 
-      className="relative"
-      style={{ width: `calc(100vw - ${sidebarWidth}px - 6px)` }}
-    >
-      <PlotCanvas posts={posts} />
-    </div>
-
-    <div
-      onMouseDown={handleMouseDown}
-      className="resizable-divider"
-      style={{
-      zIndex: 10,
-      backgroundColor: theme === "dark" ? "var(--foreground)" : "var(--background)",
-      }}
-    />
-    <div 
-      className="flex-shrink-0"
-      style={{ width: sidebarWidth }}
-    >
-      <Sidebar width={sidebarWidth} posts={posts} />
-    </div>
-
-    {}
-    
-
-  </div>
-);
+      {/* Tab Content */}
+      <div className="flex-1">
+        {activeTab === 'board' && (
+          <div key="board">
+            <ResizableLayout />
+          </div>
+        )}
+        
+        {activeTab === 'profile' && (
+          <div key="profile" className="p-6">
+            Profile content coming soon...
+          </div>
+        )}
+        
+        {activeTab === 'settings' && (
+          <div key="settings" className="p-6">
+            Settings content coming soon...
+          </div>
+        )}
+        
+        {activeTab === 'signin' && !user && (
+          <div key="signin" className="p-6">
+            <Auth />
+          </div>
+        )}
+      </div>
+    </main>
+  );
 }
+
+function tabClass(isActive: boolean) {
+  return `px-3 py-1 border-b-2 text-sm cursor-pointer bg-transparent ${
+    isActive ? 'border-white text-white' : 'border-transparent text-gray-400 hover:text-white'
+  } transition`;
+}
+

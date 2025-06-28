@@ -1,5 +1,6 @@
 import numpy as np
 from fastapi import FastAPI, HTTPException
+from typing import Optional
 from pydantic import BaseModel
 import requests
 import os
@@ -48,6 +49,9 @@ class TextInput(BaseModel):
     text: str
     image_url: str = ""  
 
+
+
+#do NOT use this most likely 
 @app.post("/post")
 def embed_text_endpoint(input: TextInput):
     try:
@@ -122,3 +126,37 @@ def get_posts():
         raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving posts: {str(e)}")
+
+
+@app.get("/reply")
+def get_replies(parent_id: Optional[str] = None):
+    if not parent_id:
+        raise HTTPException(status_code=400, detail="Missing or invalid parent_id")
+
+    try:
+        params = {
+            "parent_id": f"eq.{parent_id}",
+            "order": "created_at.asc"
+        }
+
+        response = requests.get(
+            f"{SUPABASE_URL}/rest/v1/{SUPABASE_TABLE}",
+            headers={
+                **SUPABASE_HEADERS,
+                "Prefer": "return=representation"
+            },
+            params=params
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Database error: {response.text}"
+            )
+
+        return response.json()
+
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch replies: {str(e)}")

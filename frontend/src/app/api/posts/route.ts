@@ -1,5 +1,17 @@
+import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
+
 export async function GET() {
-  const res = await fetch("http://127.0.0.1:8000/posts");
-  const posts = await res.json();
-  return Response.json(posts);
+  const supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const { data, error } = await supabase.from("posts").select("*");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data); // just the array
 }

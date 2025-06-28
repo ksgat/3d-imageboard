@@ -2,3 +2,4 @@ plan.md
 /api/.env
 /api/__pycache__
 /api/venv
+frontend/src/app/.glimpse
