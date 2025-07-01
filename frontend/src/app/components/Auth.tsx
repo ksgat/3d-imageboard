@@ -1,10 +1,10 @@
 'use client';
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/util/supabase/supabase';
+import { login, signup } from '../auth/actions';
 import type { Session, User } from '@supabase/supabase-js';
 
-export default function Page() {
+export default function Auth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,9 +37,70 @@ export default function Page() {
 }
 
 function AuthForm() {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+      
+      await login(formData);
+      // If we reach here, login was successful and redirect should happen
+    } catch (err) {
+      setError('Sign in failed. Please check your credentials.');
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('username', username);
+      
+      await signup(formData);
+      // If we reach here, signup was successful and redirect should happen
+    } catch (err) {
+      setError('Sign up failed. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Please enter your email first');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    
+    if (error) {
+      setError(error.message);
+    } else {
+      setError('Password reset email sent! Check your inbox.');
+    }
+    setLoading(false);
+  };
 
   return (
     <div
@@ -47,184 +108,95 @@ function AuthForm() {
       style={{ fontFamily: '"Times New Roman", Times, serif' }}
     >
       <div className="max-w-sm w-full flex flex-col gap-5 bg-black p-6 border border-white rounded-md">
-        {isSignUp ? (
-          <SignUpForm setIsSignUp={setIsSignUp} error={error} setError={setError} loading={loading} setLoading={setLoading} />
-        ) : (
-          <SignInForm setIsSignUp={setIsSignUp} error={error} setError={setError} loading={loading} setLoading={setLoading} />
+        <h2 className="text-2xl text-left mb-[-5px] italic">
+          <em>{mode === 'signin' ? 'Log in' : 'Sign up'}</em>
+        </h2>
+        <h1>
+          <em>{mode === 'signin' ? 'welcome back' : 'join us'}</em>
+        </h1>
+        
+        <form onSubmit={mode === 'signin' ? handleSignIn : handleSignUp} className="flex flex-col gap-5">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+            required
+            className="bg-black text-white text-base p-2.5 border border-white outline-none"
+            style={{ fontFamily: '"Times New Roman", Times, serif' }}
+          />
+          
+          {mode === 'signup' && (
+            <input
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={loading}
+              required
+              className="bg-black text-white text-base p-2.5 border border-white outline-none"
+              style={{ fontFamily: '"Times New Roman", Times, serif' }}
+            />
+          )}
+          
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            required
+            className="bg-black text-white text-base p-2.5 border border-white outline-none"
+            style={{ fontFamily: '"Times New Roman", Times, serif' }}
+          />
+          
+          {error && <p className="text-red-500 text-sm text-center m-0">{error}</p>}
+          
+          <div className="flex gap-5 justify-center">
+            <button
+              type="submit"
+              disabled={loading}
+              className={`text-white text-base px-5 py-2.5 border border-white ${
+                loading ? 'bg-gray-600 cursor-not-allowed' : 'bg-black cursor-pointer'
+              }`}
+              style={{ fontFamily: '"Times New Roman", Times, serif' }}
+            >
+              {loading ? 'Loading...' : (mode === 'signin' ? 'Sign In' : 'Sign Up')}
+            </button>
+          </div>
+        </form>
+        
+        <button
+          onClick={() => {
+            setMode(mode === 'signin' ? 'signup' : 'signin');
+            setError(null);
+          }}
+          disabled={loading}
+          className={`text-white text-base px-5 py-2.5 ${
+            loading ? 'bg-gray-600 cursor-not-allowed' : 'bg-black cursor-pointer'
+          }`}
+          style={{ fontFamily: '"Times New Roman", Times, serif' }}
+        >
+          {mode === 'signin' ? "don't have an account? Sign Up!" : "already have an account? Sign In!"}
+        </button>
+        
+        {mode === 'signin' && (
+          <button
+            onClick={handleForgotPassword}
+            disabled={loading}
+            className={`text-white text-base px-5 py-2.5 ${
+              loading ? 'bg-gray-600 cursor-not-allowed' : 'bg-black cursor-pointer'
+            }`}
+            style={{ fontFamily: '"Times New Roman", Times, serif' }}
+          >
+            forgor password?
+          </button>
         )}
       </div>
     </div>
   );
 }
-
-function SignInForm({
-  setIsSignUp,
-  error,
-  setError,
-  loading,
-  setLoading
-}: {
-  setIsSignUp: (v: boolean) => void;
-  error: string | null;
-  setError: (msg: string | null) => void;
-  loading: boolean;
-  setLoading: (v: boolean) => void;
-}) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  const signIn = async () => {
-    setLoading(true);
-    setError(null);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    setLoading(false);
-  };
-
-  return (
-    <>
-      <h2 className="text-2xl italic">Log in</h2>
-      <h1><em>welcome back</em></h1>
-
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        disabled={loading}
-        className="bg-black text-white p-2.5 border border-white"
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        disabled={loading}
-        className="bg-black text-white p-2.5 border border-white"
-      />
-      {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-      <button onClick={signIn} disabled={loading} className="border border-white py-2.5">
-        Sign In
-      </button>
-
-      <button onClick={() => setIsSignUp(true)} disabled={loading} className="text-sm underline text-center">
-        Don't have an account? Sign up
-      </button>
-    </>
-  );
-}
-
-function SignUpForm({
-  setIsSignUp,
-  error,
-  setError,
-  loading,
-  setLoading
-}: {
-  setIsSignUp: (v: boolean) => void;
-  error: string | null;
-  setError: (msg: string | null) => void;
-  loading: boolean;
-  setLoading: (v: boolean) => void;
-}) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [username, setUsername] = useState(''); // example additional field
-
-  const signUp = async () => {
-    setLoading(true);
-    setError(null);
-  
-    if (password !== confirmPassword) {
-      setError("Passwords don't match");
-      setLoading(false);
-      return;
-    }
-  
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-  
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-  
-    if (data.user) {
-      // Insert profile for the new user
-      const { error: profileError } = await supabase
-        .from("profile")
-        .insert([
-          {
-            id: data.user.id,       // important: link profile to auth user id
-            username: username,
-            // add other default profile fields here if you want
-          },
-        ]);
-  
-      if (profileError) {
-        setError(`Failed to create profile: ${profileError.message}`);
-      }
-    }
-  
-    setLoading(false);
-  };
-  
-
-  return (
-    <>
-      <h2 className="text-2xl italic">Sign up</h2>
-      <h1><em>create your account</em></h1>
-
-      <input
-        type="text"
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        disabled={loading}
-        className="bg-black text-white p-2.5 border border-white"
-      />
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        disabled={loading}
-        className="bg-black text-white p-2.5 border border-white"
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        disabled={loading}
-        className="bg-black text-white p-2.5 border border-white"
-      />
-      <input
-        type="password"
-        placeholder="Confirm Password"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        disabled={loading}
-        className="bg-black text-white p-2.5 border border-white"
-      />
-      {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-      <button onClick={signUp} disabled={loading} className="border border-white py-2.5">
-        Create Account
-      </button>
-
-      <button onClick={() => setIsSignUp(false)} disabled={loading} className="text-sm underline text-center">
-        Already have an account? Log in
-      </button>
-    </>
-  );
-}
-
 
 interface DashboardProps {
   user: User | null;

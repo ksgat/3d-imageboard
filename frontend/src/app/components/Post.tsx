@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { Post } from "./PlotCanvas";
 import { supabase } from "@/util/supabase/supabase";
 import type { Session } from "@supabase/supabase-js";
-
+import { Post } from "../types/Post";
 const CLOUD_NAME = "didu3zhu4";
 const UPLOAD_PRESET = "ml_default";
 
@@ -43,7 +42,6 @@ export default function Posts({ posts }: { posts: Post[] }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
 
-  // NEW state for file name display
   const [fileName, setFileName] = useState("No file chosen");
 
   useEffect(() => {
@@ -61,7 +59,7 @@ export default function Posts({ posts }: { posts: Post[] }) {
   useEffect(() => {
     if (!image) {
       setPreviewUrl(null);
-      setFileName("No file chosen"); // Reset file name if no image
+      setFileName("No file chosen");
       return;
     }
     const url = URL.createObjectURL(image);
@@ -69,7 +67,6 @@ export default function Posts({ posts }: { posts: Post[] }) {
     return () => URL.revokeObjectURL(url);
   }, [image]);
 
-  // NEW handler to update file and fileName
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null;
     setImage(file);

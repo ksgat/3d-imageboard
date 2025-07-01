@@ -1,4 +1,4 @@
-import { Post } from "./PlotCanvas";
+import { Post } from "../types/Post";
 import { useState } from "react";
 import Posts from "./Post";
 import Settings from "./Settings";

@@ -3,3 +3,4 @@ plan.md
 /api/__pycache__
 /api/venv
 frontend/src/app/.glimpse
+refactor_plan.md

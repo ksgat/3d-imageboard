@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Post } from "./PlotCanvas";
+import { Post } from "../types/Post";
 import { supabase } from "@/util/supabase/supabase";
 
 interface PostViewProps {
@@ -106,7 +106,7 @@ const PostView: React.FC<PostViewProps> = ({ selectedPost, onClose }) => {
       </button>
 
       <h2 className="text-xl font-bold text-white">{selectedPost.title}</h2>
-      {posterProfile ? (
+{posterProfile ? (
   <div className="flex items-center space-x-3 mt-2 mb-2">
     <img
       src={posterProfile.profile_picture}
