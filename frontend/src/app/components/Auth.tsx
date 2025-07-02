@@ -8,19 +8,19 @@ export default function Auth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => listener?.subscription.unsubscribe();
-  }, []);
-
+    useEffect(() => {
+      supabase.auth.getSession().then(({ data }) => {
+        setSession(data.session);
+        setLoading(false);
+      });
+    
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        setLoading(false); 
+      });
+    
+      return () => listener?.subscription.unsubscribe();
+    }, []);
   if (loading)
     return (
       <div
@@ -50,36 +50,49 @@ function AuthForm() {
     setError(null);
     
     try {
-      const formData = new FormData();
-      formData.append('email', email);
-      formData.append('password', password);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       
-      await login(formData);
-      // If we reach here, login was successful and redirect should happen
-    } catch (err) {
-      setError('Sign in failed. Please check your credentials.');
+      if (error) {
+        throw error;
+      }
+      
+    } catch (err: any) {
+      setError(err.message || 'Sign in failed. Please check your credentials.');
       setLoading(false);
     }
   };
-
+  
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     
     try {
-      const formData = new FormData();
-      formData.append('email', email);
-      formData.append('password', password);
-      formData.append('username', username);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username,
+          }
+        }
+      });
       
-      await signup(formData);
-      // If we reach here, signup was successful and redirect should happen
-    } catch (err) {
-      setError('Sign up failed. Please try again.');
+      if (error) {
+        throw error;
+      }
+      
+      setError('Email confirmation sent! Check your inbox.');
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message || 'Sign up failed. Please try again.');
       setLoading(false);
     }
   };
+  
 
   const handleForgotPassword = async () => {
     if (!email) {

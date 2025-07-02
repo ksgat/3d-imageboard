@@ -1,22 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo} from "react";
+import { useState, useEffect, useRef} from "react";
 import { useParams } from "next/navigation";
 import { supabase } from '@/util/supabase/supabase';
 import { Post } from "@/app/types/Post";
-
+import { uploadToCloudinary, convertToWebP } from "@/app/components/Post";
 import PlotCanvas from "@/app/components/PlotCanvas";
-
-interface ProfileData {
-  username: string;
-  profile_picture: string;
-  tag?: string | null;
-  bio?: string | null;
-  point_x?: number | null;
-  point_y?: number | null;
-  point_z?: number | null;
-}
-
+import { ProfileData } from "@/app/types/Profile";
 export default function ProfilePage() {
   const { username } = useParams();
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -24,6 +14,19 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: userData, error } = await supabase.auth.getUser();
+      if (userData.user) {
+        setCurrentUser(userData.user);
+      }
+    }
+    checkAuth();
+  }, []);
 
  
   useEffect(() => {
@@ -38,9 +41,8 @@ export default function ProfilePage() {
       }
 
       try {
-        // Fetch profile data from Supabase
         const { data: profileData, error: profileError } = await supabase
-          .from('profile') // Adjust table name as needed
+          .from('profile') 
           .select('*')
           .eq('username', username)
           .single();
@@ -54,9 +56,8 @@ export default function ProfilePage() {
         }
 
         setProfile(profileData);
-        const user = profileData.id; // Assuming profileData has an 'id' field for the user
+        const user = profileData.id; 
 
-        // Fetch user posts from Supabase
         setPostsLoading(true);
         const { data: postsData, error: postsError } = await supabase
             .from('posts')
@@ -85,7 +86,36 @@ export default function ProfilePage() {
     fetchProfileData();
   }, [username]);
 
-  // Export posts data as JSON for external use
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const webpBlob = await convertToWebP(file);
+      const uploadedUrl = await uploadToCloudinary(webpBlob);
+
+      const { error: updateError } = await supabase
+        .from('profile')
+        .update({ profile_picture: uploadedUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => prev ? { ...prev, profile_picture: uploadedUrl } : prev);
+
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = ""; 
+    }
+  }
+
   const exportPostsData = () => {
     const exportData = {
       username: profile?.username,
@@ -104,7 +134,7 @@ export default function ProfilePage() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
+  
   if (loading) {
     return (
       <div 
@@ -153,14 +183,33 @@ export default function ProfilePage() {
         {/* Profile Header */}
         <div className="bg-black border border-white rounded-md p-6 mb-5">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-            <div className="flex-shrink-0">
-              <img
-                src={profile.profile_picture}
-                alt={`${profile.username}'s profile`}
-                className="w-32 h-32 rounded-full object-cover border-2 border-white"
-              />
-            </div>
-  
+              <div className="flex-shrink-0">
+                <img
+                  src={profile.profile_picture}
+                  alt={`${profile.username}'s profile`}
+                  className="w-32 h-32 rounded-full object-cover border-2 border-white"
+                />
+                
+                {currentUser && currentUser.id === profile.id && (
+                  <div>
+                    <p
+                      className="mt-2 underline text-sm cursor-pointer"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {uploading ? "Uploading..." : "Change profile picture"}
+                    </p>
+                    {uploadError && <p className="text-red-500 text-xs mt-1">{uploadError}</p>}
+                    <input
+                      id="profile-pic-upload"
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </div>
+                )}
+              </div>
             <div className="flex-1 text-center md:text-left">
               <h1 className="text-3xl mb-2 italic">
                 <em>{profile.username}</em>

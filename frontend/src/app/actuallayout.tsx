@@ -30,7 +30,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       setSession(prev =>
         prev?.access_token === session?.access_token ? prev : session
       );
-      // Close modal on successful auth
+
       if (session) {
         setShowAuthModal(false);
       } 
@@ -149,7 +149,6 @@ function Tab({ href, label, active }: { href: string; label: string; active: boo
 }
 
 function AuthModalOverlay({ onClose }: { onClose: () => void }) {
-  // Close modal on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

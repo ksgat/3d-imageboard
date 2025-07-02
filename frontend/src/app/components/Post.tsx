@@ -5,7 +5,7 @@ import { Post } from "../types/Post";
 const CLOUD_NAME = "didu3zhu4";
 const UPLOAD_PRESET = "ml_default";
 
-async function convertToWebP(file: File): Promise<Blob> {
+export async function convertToWebP(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
@@ -19,7 +19,7 @@ async function convertToWebP(file: File): Promise<Blob> {
   });
 }
 
-async function uploadToCloudinary(webpBlob: Blob): Promise<string> {
+export async function uploadToCloudinary(webpBlob: Blob): Promise<string> {
   const formData = new FormData();
   formData.append("file", webpBlob);
   formData.append("upload_preset", UPLOAD_PRESET);
@@ -81,54 +81,72 @@ export default function Posts({ posts }: { posts: Post[] }) {
   };
 
   const handleSubmit = async () => {
+    if (!session) {
+      alert("You must be logged in to post");
+      return;
+    }
+  
     try {
       const imageUrl = await handleImageUpload();
-      const requestBody = {
-        title,
-        text,
-        image_url: imageUrl || "",
-      };
-
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Error getting session:", error);
-        alert("Could not retrieve session");
-        return;
-      }
-
-      const token = data.session?.access_token;
-      if (!token) {
-        console.error("No access token found in session");
-        alert("You must be logged in to post");
-        return;
-      }
-
-      console.log("Request Body:", requestBody);
-
-      const response = await fetch("/api/post", {
+  
+      const embedResponse = await fetch("http://localhost:8000/embed-only", {
         method: "POST",
-        body: JSON.stringify(requestBody),
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          title,
+          text,
+        }),
       });
-
-      const result = await response.json();
-      console.log("API Response:", result);
-
-      if (response.ok) {
-        alert("Post created successfully!");
-      } else {
-        alert("Failed to create post: " + result.error);
+  
+      if (!embedResponse.ok) {
+        const errorText = await embedResponse.text();
+        console.error("Embedding service error:", errorText);
+        alert("Failed to embed text.");
+        return;
       }
+  
+      const embedResult = await embedResponse.json();
+      const [pointX, pointY, pointZ] = embedResult.coordinates;
+  
+      const { data, error } = await supabase
+        .from("posts")
+        .insert([
+          {
+            title,
+            point_x: pointX,
+            point_y: pointY,
+            point_z: pointZ,
+            post_content_text: text || null,
+            post_content_image: imageUrl || null,
+            parent_id: null, 
+            poster_id: session.user.id,
+          },
+        ])
+        .select();
+  
+      if (error) {
+        console.error("Insert error:", error);
+        alert("Failed to create post: " + error.message);
+        return;
+      }
+  
+      console.log("Inserted post:", data);
+      alert("Post created successfully!");
+  
+      setTitle("");
+      setText("");
+      setImage(null);
+      setFileName("No file chosen");
     } catch (err) {
       console.error("Error during submit:", err);
       alert("Something went wrong.");
     }
   };
 
-  return (
+
+    return (
     <div className="bg-black text-white min-h-screen p-4">
       <h2 className="text-white text-2xl font-bold mb-4">Posts</h2>
 
