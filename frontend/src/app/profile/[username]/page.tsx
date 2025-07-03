@@ -18,7 +18,6 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
- 
     console.log(currentUser);
     async function checkAuth() {
       const { data: userData } = await supabase.auth.getUser();
@@ -27,9 +26,8 @@ export default function ProfilePage() {
       }
     }
     checkAuth();
-  });
+  }, []); 
 
- 
   useEffect(() => {
     async function fetchProfileData() {
       setLoading(true);
@@ -87,8 +85,6 @@ export default function ProfilePage() {
     fetchProfileData();
   }, [username]);
 
-
-  
   const exportPostsData = () => {
     const exportData = {
       username: profile?.username,
@@ -141,7 +137,7 @@ export default function ProfilePage() {
       >
         <div className="text-center">
           <h2 className="text-2xl italic mb-2"><em>Profile not found</em></h2>
-          <p>This user does&apos;t exist.</p>
+          <p>This user doesn&apos;t exist.</p>
           </div>
       </div>
     );
@@ -153,7 +149,7 @@ export default function ProfilePage() {
       style={{ fontFamily: '"Times New Roman", Times, serif' }}
     >
       <div className="max-w-4xl mx-auto">
-        {/* Profile Header */}
+        {}
         <div className="bg-black border border-white rounded-md p-6 mb-5">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
               
@@ -194,9 +190,10 @@ export default function ProfilePage() {
                   <em>User Coords</em>
                 </h3>
                 <div className="text-sm">
-                  <span>X: {profile.point_x?.toFixed(2) || "0.00"}</span>
-                  <span className="ml-4">Y: {profile.point_y?.toFixed(2) || "0.00"}</span>
-                  <span className="ml-4">Z: {profile.point_z?.toFixed(2) || "0.00"}</span>
+                  {}
+                  <span>X: {profile.point_x !== null && profile.point_x !== undefined ? profile.point_x.toFixed(2) : "0.00"}</span>
+                  <span className="ml-4">Y: {profile.point_y !== null && profile.point_y !== undefined ? profile.point_y.toFixed(2) : "0.00"}</span>
+                  <span className="ml-4">Z: {profile.point_z !== null && profile.point_z !== undefined ? profile.point_z.toFixed(2) : "0.00"}</span>
                 </div>
               </div>
             </div>
@@ -269,8 +266,11 @@ export default function ProfilePage() {
                   </div>
   
                   <div className="border border-white rounded-md p-3 inline-block text-sm">
-                    <strong>Coordinates:</strong> X: {post.point_x.toFixed(2)}, Y:{" "}
-                    {post.point_y.toFixed(2)}, Z: {post.point_z.toFixed(2)}
+                    <strong>Coordinates:</strong> 
+                    { }
+                    X: {post.point_x !== null && post.point_x !== undefined ? post.point_x.toFixed(2) : "0.00"}, 
+                    Y: {post.point_y !== null && post.point_y !== undefined ? post.point_y.toFixed(2) : "0.00"}, 
+                    Z: {post.point_z !== null && post.point_z !== undefined ? post.point_z.toFixed(2) : "0.00"}
                   </div>
                 </div>  
               ))
@@ -279,8 +279,6 @@ export default function ProfilePage() {
         </div>
         <div className="w-full max-w-5xl mx-auto p-4">
             
-    
-
         </div>
       </div>
     </div>
