@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { supabase } from '@/util/supabase/supabase';
 import type { Session } from '@supabase/supabase-js';
 import Auth from '@/app/components/Auth';
-import { getUsername } from './auth/actions';
 export default function Shell({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);

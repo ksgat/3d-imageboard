@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef} from "react";
+import { useState, useEffect} from "react";
 import { useParams } from "next/navigation";
 import { supabase } from '@/util/supabase/supabase';
 import { Post } from "@/app/types/Post";
-import { uploadToCloudinary, convertToWebP } from "@/app/components/Post";
-import PlotCanvas from "@/app/components/PlotCanvas";
 import { ProfileData } from "@/app/types/Profile";
+import Image from "next/image";
+import type { User } from '@supabase/supabase-js';
+
 export default function ProfilePage() {
   const { username } = useParams();
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -14,19 +15,19 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
+ 
+    console.log(currentUser);
     async function checkAuth() {
-      const { data: userData, error } = await supabase.auth.getUser();
+      const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
         setCurrentUser(userData.user);
       }
     }
     checkAuth();
-  }, []);
+  });
 
  
   useEffect(() => {
@@ -86,36 +87,8 @@ export default function ProfilePage() {
     fetchProfileData();
   }, [username]);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !profile) return;
-
-    setUploading(true);
-    setUploadError(null);
-
-    try {
-      const webpBlob = await convertToWebP(file);
-      const uploadedUrl = await uploadToCloudinary(webpBlob);
-
-      const { error: updateError } = await supabase
-        .from('profile')
-        .update({ profile_picture: uploadedUrl })
-        .eq('id', profile.id);
-
-      if (updateError) throw updateError;
-
-      setProfile(prev => prev ? { ...prev, profile_picture: uploadedUrl } : prev);
-
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Upload failed");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = ""; 
-    }
-  }
-
+  
   const exportPostsData = () => {
     const exportData = {
       username: profile?.username,
@@ -168,8 +141,8 @@ export default function ProfilePage() {
       >
         <div className="text-center">
           <h2 className="text-2xl italic mb-2"><em>Profile not found</em></h2>
-          <p>The user you're looking for doesn't exist.</p>
-        </div>
+          <p>This user does&apos;t exist.</p>
+          </div>
       </div>
     );
   }
@@ -183,31 +156,20 @@ export default function ProfilePage() {
         {/* Profile Header */}
         <div className="bg-black border border-white rounded-md p-6 mb-5">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+              
               <div className="flex-shrink-0">
-                <img
-                  src={profile.profile_picture}
-                  alt={`${profile.username}'s profile`}
-                  className="w-32 h-32 rounded-full object-cover border-2 border-white"
-                />
-                
-                {currentUser && currentUser.id === profile.id && (
-                  <div>
-                    <p
-                      className="mt-2 underline text-sm cursor-pointer"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {uploading ? "Uploading..." : "Change profile picture"}
-                    </p>
-                    {uploadError && <p className="text-red-500 text-xs mt-1">{uploadError}</p>}
-                    <input
-                      id="profile-pic-upload"
-                      type="file"
-                      accept="image/*"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </div>
+
+              {profile.profile_picture ? (
+                  <Image
+                    src={profile.profile_picture}
+                    alt={`${profile.username}'s profile`}
+                    width={128}
+                    height={128}
+                    className="rounded-full object-cover border-2 border-white"
+                    unoptimized={true} 
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-gray-300 border-2 border-white" />
                 )}
               </div>
             <div className="flex-1 text-center md:text-left">
@@ -272,7 +234,7 @@ export default function ProfilePage() {
                 <h3 className="text-lg mb-2 italic">
                   <em>No posts yet</em>
                 </h3>
-                <p>This user hasn't posted anything yet.</p>
+                <p>This user hasn&apos;t posted anything yet.</p>
               </div>
             ) : (
               posts.map((post) => (
@@ -295,11 +257,14 @@ export default function ProfilePage() {
                       {post.post_content_text ?? "(No content)"}
                     </p>
                     {post.post_content_image && (
-                      <img
-                        src={post.post_content_image}
-                        alt="Post image"
-                        className="mt-4 max-w-full rounded"
-                      />
+                       <Image
+                       src={post.post_content_image}
+                       alt="Post image"
+                       width={800}
+                       height={600}      
+                       className="mt-4 rounded"
+                       style={{ maxWidth: "100%", height: "auto" }}
+                     />
                     )}
                   </div>
   

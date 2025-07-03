@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Post } from "../types/Post";
+import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/util/supabase/supabase";
-
+import  Image from "next/image";
+import Link from "next/link";
 interface PostViewProps {
   selectedPost: Post | null;
   onClose: () => void;
@@ -13,35 +15,57 @@ const PostView: React.FC<PostViewProps> = ({ selectedPost, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isPosting, setIsPosting] = useState(false);
-
+  const [user] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [posterProfile, setPosterProfile] = useState<{
     username: string;
     profile_picture: string;
   } | null>(null);
+    useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => listener.subscription.unsubscribe();
+    }, []);
+    
 
   useEffect(() => {
     if (!selectedPost?.post_id) {
       setReplies([]);
       return;
     }
-
+  
     setLoading(true);
     setError(null);
+  
+    const fetchReplies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('parent_id', selectedPost.post_id);
+  
+        if (error) throw error;
+        console.log(data)
 
-    fetch(`/api/get_replys?parent_id=${selectedPost.post_id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load replies");
-        return res.json();
-      })
-      .then((data: Post[]) => {
-        setReplies(data);
-      })
-      .catch((e) => {
-        setError(e.message);
-      })
-      .finally(() => {
+        setReplies(data ?? []);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('An unknown error occurred');
+        }
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+  
+    fetchReplies();
   }, [selectedPost]);
 
   useEffect(() => {
@@ -64,26 +88,29 @@ const PostView: React.FC<PostViewProps> = ({ selectedPost, onClose }) => {
         }
       });
   }, [selectedPost?.poster_id]);
-
+  
+  
   const handleReply = async () => {
+    if (!session && !user) {
+      alert("You must be logged in to reply.");
+      return;
+    }
     if (!selectedPost?.post_id || replyText.trim() === "") return;
-
+  
     setIsPosting(true);
     try {
-      const res = await fetch("/api/reply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { data: newReply, error } = await supabase
+        .from('posts')
+        .insert({
           parent_id: selectedPost.post_id,
-          text: replyText.trim(),
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to post reply");
-      }
-
-      const newReply = await res.json();
+          post_content_text: replyText.trim(),
+          poster_id: session?.user.id,
+        })
+        .select()
+        .single();
+  
+      if (error) throw error;
+  
       setReplies((prev) => [...prev, newReply]);
       setReplyText("");
     } catch (err) {
@@ -93,7 +120,6 @@ const PostView: React.FC<PostViewProps> = ({ selectedPost, onClose }) => {
       setIsPosting(false);
     }
   };
-
   if (!selectedPost) return null;
 
   return (
@@ -108,13 +134,17 @@ const PostView: React.FC<PostViewProps> = ({ selectedPost, onClose }) => {
       <h2 className="text-xl font-bold text-white">{selectedPost.title}</h2>
 {posterProfile ? (
   <div className="flex items-center space-x-3 mt-2 mb-2">
-    <img
-      src={posterProfile.profile_picture}
-      alt={`${posterProfile.username}'s profile`}
-      className="w-8 h-8 rounded-full border border-white"
-    />
-    <span className="text-white font-medium">@{posterProfile.username}</span>
-  </div>
+          <Image
+        src={posterProfile.profile_picture}
+        alt="..."
+        width={60}
+        height={60}
+        
+        className="object-cover rounded-full"
+        />
+<Link href={`/profile/${posterProfile.username}`} className="text-white font-medium hover:underline">
+  @{posterProfile.username}
+</Link>  </div>
 ) : (
   <p className="text-white">No profile found</p>
 )}
@@ -122,11 +152,14 @@ const PostView: React.FC<PostViewProps> = ({ selectedPost, onClose }) => {
 
       <p className="mt-2 text-white">{selectedPost.post_content_text}</p>
       {selectedPost.post_content_image && (
-        <img
-          src={selectedPost.post_content_image}
-          alt={selectedPost.title}
-          className="mt-4 max-w-full max-h-[300px] object-contain"
-        />
+       <Image
+       src={selectedPost.post_content_image}
+       alt={selectedPost.title}
+       width={800}
+       height={600}
+       className="mt-4 object-contain"
+       style={{ maxWidth: "100%", maxHeight: "300px" }}
+     />
       )}
 
       {/* Reply box */}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/util/supabase/supabase";
 import type { Session } from "@supabase/supabase-js";
-import { Post } from "../types/Post";
+import Image from "next/image";
 const CLOUD_NAME = "didu3zhu4";
 const UPLOAD_PRESET = "ml_default";
 
@@ -35,7 +35,7 @@ export async function uploadToCloudinary(webpBlob: Blob): Promise<string> {
   return data.secure_url;
 }
 
-export default function Posts({ posts }: { posts: Post[] }) {
+export default function Posts() {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [image, setImage] = useState<File | null>(null);
@@ -198,12 +198,15 @@ export default function Posts({ posts }: { posts: Post[] }) {
           </label>
 
           {previewUrl && (
-            <img
-              src={previewUrl}
-              alt="Preview"
-              className="mt-4 max-w-xs max-h-48 object-contain rounded border border-gray-600"
-            />
-          )}
+              <div className="mt-4 max-w-xs max-h-48 relative border border-gray-600 rounded overflow-hidden">
+                <Image
+                  src={previewUrl}
+                  alt="Preview"
+                  layout="fill"
+                  objectFit="contain"
+                />
+              </div>
+            )}
 
           <button
             type="submit"

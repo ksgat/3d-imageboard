@@ -88,4 +88,4 @@ export default function ResizableLayout() {
       </div>
     </div>
   );
-  
+}

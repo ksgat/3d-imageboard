@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/util/supabase/supabase';
 import { convertToWebP, uploadToCloudinary } from '../components/Post';
-
+import { ProfileData } from '../types/Profile';
+import Image from 'next/image';
 export default function Settings() {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     username: '',
@@ -90,20 +91,28 @@ export default function Settings() {
         alert("Failed to update profile: " + error.message);
       } else {
         alert("Profile updated.");
-        setProfile((prev: any) => ({
-          ...prev,
-          ...formData,
-          profile_picture: uploadedUrl,
-        }));
+        setProfile((prev: ProfileData | null) => {
+          if (!prev) return null; // must return null or valid ProfileData
+          return {
+            ...prev,
+            ...formData,
+            profile_picture: uploadedUrl,
+            id: prev.id, // explicitly add id to reassure TS
+          };
+        });
         setImageFile(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      alert("Unexpected error: " + err.message);
+      if (err instanceof Error) {
+        alert("Unexpected error: " + err.message);
+      } else {
+        alert("An unknown error occurred.");
+      }
     } finally {
       setUploading(false);
     }
-  };
+      };
 
   if (loading) return <p className="text-white">Loading...</p>;
 
@@ -113,11 +122,14 @@ export default function Settings() {
 
       {/* Profile Picture Preview */}
       {previewUrl && (
-        <img
-          src={previewUrl}
-          alt="Profile preview"
-          className="w-24 h-24 rounded-full mb-4 object-cover border border-gray-600"
-        />
+            <Image
+            src={previewUrl}
+            alt="Profile preview"
+            width={96}
+            height={96}
+            className="rounded-full mb-4 object-cover border border-gray-600"
+          />
+ 
       )}
 
       <label className="block mb-4">

@@ -1,7 +1,7 @@
 export interface ProfileData {
     id: string; 
     username: string; 
-    profile_picture: string; 
+    profile_picture: string | null; 
     tag?: string | null; 
     bio?: string | null; 
     point_x?: number | null; 

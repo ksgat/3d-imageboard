@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/util/supabase/supabase';
-import { login, signup } from '../auth/actions';
 import type { Session, User } from '@supabase/supabase-js';
 
 export default function Auth() {
@@ -50,17 +49,20 @@ function AuthForm() {
     setError(null);
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
-      if (error) {
-        throw error;
+      if (error) throw error;
+  
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Sign in failed. Please check your credentials.');
       }
-      
-    } catch (err: any) {
-      setError(err.message || 'Sign in failed. Please check your credentials.');
+    } finally {
       setLoading(false);
     }
   };
@@ -69,32 +71,34 @@ function AuthForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
+  
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             username: username,
-          }
-        }
+          },
+        },
       });
-      
-      if (error) {
-        throw error;
-      }
-      
+  
+      if (error) throw error;
+  
       setError('Email confirmation sent! Check your inbox.');
-      setLoading(false);
-    } catch (err: any) {
-      setError(err.message || 'Sign up failed. Please try again.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Sign up failed. Please try again.');
+      }
+    } finally {
       setLoading(false);
     }
   };
-  
 
-  const handleForgotPassword = async () => {
+
+    const handleForgotPassword = async () => {
     if (!email) {
       setError('Please enter your email first');
       return;

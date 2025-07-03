@@ -20,7 +20,8 @@ export default function PlotCanvas({ posts, onPostSelect }: PlotCanvasProps) {
     useEffect(() => {
         if (!canvasRef.current) return;
 
-        const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: true });
+        const canvas = canvasRef.current;  
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setClearColor(0x1e1e1e);
         rendererRef.current = renderer;
@@ -110,7 +111,7 @@ export default function PlotCanvas({ posts, onPostSelect }: PlotCanvasProps) {
             sphere.position.set(post.point_x, post.point_y, post.point_z);
             sphere.userData = { post };
 
-            const label = createTextLabel(post.title, sphere);
+            const label = createTextLabel(post.title);
             sphere.add(label);
             
             sceneRef.current?.add(sphere);
@@ -140,16 +141,16 @@ export default function PlotCanvas({ posts, onPostSelect }: PlotCanvasProps) {
         };
       
         canvasRef.current.addEventListener("click", onClick);
-      
+    const canvas = canvasRef.current;
         return () => {
-          canvasRef.current?.removeEventListener("click", onClick);
+          canvas?.removeEventListener("click", onClick);
         };
       }, [onPostSelect]);
 
     return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full" />;
 }
 
-function createTextLabel(text: string, parent: THREE.Mesh): THREE.Sprite {
+function createTextLabel(text: string): THREE.Sprite {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 128;
